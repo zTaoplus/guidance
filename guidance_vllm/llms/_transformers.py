@@ -8,7 +8,6 @@ import threading
 import collections.abc
 from ._llm import LLM, LLMSession, SyncSession
 
-
 class Transformers(LLM):
     """ A HuggingFace transformers language model with Guidance support.
     """
@@ -28,7 +27,7 @@ class Transformers(LLM):
                     model = file.read().replace('\n', '')
             except:
                 pass
-
+        self.vllm_mode = kwargs.get("vllm_mode", "UKN")
         self.model_obj, self.tokenizer = self._model_and_tokenizer(model, tokenizer, **kwargs)
 
         self.model_name = model if isinstance(model, str) else model.__class__.__name__
@@ -178,6 +177,7 @@ class TransformersSession(LLMSession):
         """ Generate a completion of the given prompt.
         """
         
+        
         # fill in defaults
         if temperature is None:
             temperature = self.llm.temperature
@@ -300,28 +300,50 @@ class TransformersSession(LLMSession):
             )
 
             # the args for the transformers generate call
-            generate_args = dict(
-                inputs=input_ids,
-                # attention_mask=attention_mask,
-                # position_ids=position_ids,
-                temperature=temperature,
-                max_new_tokens=max_tokens,
-                top_p=top_p,
-                pad_token_id=model_config.pad_token_id if model_config.pad_token_id is not None else self.llm.tokenizer.eos_token_id,
-                logits_processor=transformers.LogitsProcessorList(processors),
-                stopping_criteria=transformers.StoppingCriteriaList(stoppers),
-                # past_key_values=self._past_key_values,
-                output_scores=logprobs is not None and logprobs > 0,
-                return_dict_in_generate=True,
-                **generate_kwargs
-            )
+            # generate_args = dict(
+            #     inputs=input_ids,
+            #     # attention_mask=attention_mask,
+            #     # position_ids=position_ids,
+            #     temperature=temperature,
+            #     max_new_tokens=max_tokens,
+            #     top_p=top_p,
+            #     pad_token_id=model_config.pad_token_id if model_config.pad_token_id is not None else self.llm.tokenizer.eos_token_id,
+            #     logits_processor=transformers.LogitsProcessorList(processors),
+            #     stopping_criteria=transformers.StoppingCriteriaList(stoppers),
+            #     # past_key_values=self._past_key_values,
+            #     output_scores=logprobs is not None and logprobs > 0,
+            #     return_dict_in_generate=True,
+            #     **generate_kwargs
+            # )
+            
+            if self.llm.vllm_mode=="local":
+                from vllm import SamplingParams
+                generate_args = {
+                    "prompt_token_ids":input_ids.tolist(),
+                    "sampling_params":SamplingParams(
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        top_p=top_p,
+                        stop = [stop] if isinstance(stop,str) else [st for st in stop] 
+                    )
+                }
 
+            elif self.llm.vllm_mode=="svc":
+                generate_args = {"request_dict": dict(prompt_token_ids=input_ids.tolist()[0],
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        top_p=top_p,
+                        stop = [stop] if isinstance(stop,str) else [st for st in stop] )}
+            else:
+                raise RuntimeError(f"The currently supported vllm mode are local and svc. but given: {self.llm.vllm_mode},"
+                                   f"You can specify through the `guidance_vllm.llms.Transformers(...,vllm_mode='svc')`")
+        
             # override the model config for do_sample when the temperature requires it
-            do_sample = getattr(model_config, "do_sample", None)
-            if do_sample is True and temperature == 0:
-                generate_args["do_sample"] = False
-            elif do_sample is False and temperature > 0:
-                generate_args["do_sample"] = True
+            # do_sample = getattr(model_config, "do_sample", None)
+            # if do_sample is True and temperature == 0:
+            #     generate_args["do_sample"] = False
+            # elif do_sample is False and temperature > 0:
+            #     generate_args["do_sample"] = True
 
             # if we are streaming then we need to run the inference process in a separate thread
             if stream:
@@ -661,7 +683,10 @@ class TransformersStreamer():
 
         if isinstance(new_tokens, torch.Tensor):
             new_tokens = new_tokens.cpu()
-        
+            
+        if isinstance(new_tokens,list):
+            new_tokens = torch.as_tensor(new_tokens)
+
         # if we are given a single sequence, then make it a batch of size 1
         if len(new_tokens.shape) == 1:
             new_tokens = new_tokens.unsqueeze(0)

@@ -19,15 +19,15 @@ def find_version(*file_paths):
 
 
 setup(
-    name="guidance",
-    version=find_version("guidance", "__init__.py"),
+    name="guidance_vllm",
+    version=find_version("guidance_vllm", "__init__.py"),
     url="https://github.com/slundberg/guidance",
     author="Scott Lundberg and Marco Tulio Ribeiro",
     author_email="scott.lundberg@microsoft.com",
     description="A guidance language for controlling large language models.",
     long_description="Guidance enables you to control modern language models more effectively and efficiently than traditional prompting or chaining. Guidance programs allow you to interleave generation, prompting, and logical control into a single continuous flow matching how the language model actually processes the text.",
     packages=find_packages(exclude=["user_studies", "notebooks", "client"]),
-    package_data={"guidance": ["resources/*"]},
+    package_data={"guidance_vllm": ["resources/*"]},
     install_requires=[
         "diskcache",
         "gptcache",
@@ -41,6 +41,8 @@ setup(
         "requests",
         "numpy",
         "aiohttp",
+        "vllm>=0.2.0",
+        "loguru",
     ],
     extras_require={
         'docs': [

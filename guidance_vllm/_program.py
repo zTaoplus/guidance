@@ -15,12 +15,13 @@ import nest_asyncio
 from . import _utils
 from ._program_executor import ProgramExecutor
 from . import commands
-import guidance
+import guidance_vllm
 log = logging.getLogger(__name__)
+
 
 # load the javascript client code
 file_path = pathlib.Path(__file__).parent.parent.absolute()
-with open(file_path / "guidance" / "resources" / "main.js", encoding="utf-8") as f:
+with open(file_path / "guidance_vllm" / "resources" / "main.js", encoding="utf-8") as f:
     js_data = f.read()
 
 class Log:
@@ -116,7 +117,7 @@ class Program:
         
         # save the given parameters
         self._text = text
-        self.llm = llm or getattr(guidance, "llm", None)
+        self.llm = llm or getattr(guidance_vllm, "llm", None)
         self.cache_seed = cache_seed
         self.caching = caching
         self.logprobs = logprobs
@@ -285,7 +286,6 @@ class Program:
                 nest_asyncio.apply(other_loop)
             except RuntimeError:
                 pass
-            
             loop = asyncio.new_event_loop()
             update_task = loop.create_task(new_program.update_display.run()) # start the display updater
             new_program._tasks.append(update_task)
@@ -454,6 +454,7 @@ class Program:
         # in the main coroutine
         except Exception as exception:
             self._exception = exception
+            raise exception
 
         finally:
             # delete the executor and so mark the program as not executing
