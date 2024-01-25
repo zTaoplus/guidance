@@ -41,8 +41,8 @@ setup(
         "requests",
         "numpy",
         "aiohttp",
-        "vllm>=0.2.0",
         "loguru",
+        "transformers"
     ],
     extras_require={
         'docs': [
