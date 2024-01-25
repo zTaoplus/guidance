@@ -8,6 +8,20 @@ import threading
 import collections.abc
 from ._llm import LLM, LLMSession, SyncSession
 
+
+PREFIX_POS = 0
+
+
+def set_prefix_pos(val):
+    global PREFIX_POS
+    PREFIX_POS = val
+
+
+def get_prefix_pos():
+    global PREFIX_POS
+    return PREFIX_POS
+
+
 class Transformers(LLM):
     """ A HuggingFace transformers language model with Guidance support.
     """
@@ -315,7 +329,8 @@ class TransformersSession(LLMSession):
             #     return_dict_in_generate=True,
             #     **generate_kwargs
             # )
-            
+            input_id_tokens = input_ids.tolist()[0]
+
             if self.llm.vllm_mode=="local":
                 from vllm import SamplingParams
                 generate_args = {
@@ -329,10 +344,11 @@ class TransformersSession(LLMSession):
                 }
 
             elif self.llm.vllm_mode=="svc":
-                generate_args = {"request_dict": dict(prompt_token_ids=input_ids.tolist()[0],
+                generate_args = {"request_dict": dict(prompt_token_ids=input_id_tokens,
                         temperature=temperature,
                         max_tokens=max_tokens,
                         top_p=top_p,
+                        prefix_pos=get_prefix_pos() ,
                         stop = [stop] if isinstance(stop,str) else [st for st in stop] )}
             else:
                 raise RuntimeError(f"The currently supported vllm mode are local and svc. but given: {self.llm.vllm_mode},"
@@ -770,6 +786,8 @@ class TransformersStreamer():
                         put_data = True
                 self.sequence_pos[i] = len(self.generated_sequence[i])
         
+        from loguru import logger
+        logger.info(f"out:{out}")
         if put_data:
             self.out_queue.put(out)
 

@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 import logging
 
 import os
-import torch
+
 from transformers import AutoConfig, AutoTokenizer
 
 
@@ -44,6 +44,7 @@ class VllmModel:
         sampling_params: "SamplingParams",
         **kwargs,
     ):
+        import torch
         logging.debug(f"input token ids: {prompt_token_ids}")
         outputs: "RequestOutput" = self.model.generate(
             prompt_token_ids=prompt_token_ids,
